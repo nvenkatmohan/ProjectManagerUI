@@ -1,0 +1,97 @@
+
+<div class="container">
+    
+  <div class="row">
+    
+    <div class="col-md-4">
+      
+      <h4>Add Task </h4>
+      <br/>
+      <form [formGroup]="myFrmGrp" (ngSubmit)="saveTask()">
+        <!-- Task -->
+        <div class="form-group">
+          
+          <span style="color: red">*</span> <label>Task:</label>   
+          
+          <input type="text" [formControl]="task_name" name="task" 
+              class="form-control" [ngClass]="{ 'is-invalid': submitted && task_name.errors }" />
+          
+          <div *ngIf="submitted && task_name.errors" class="invalid-feedback">
+              <div *ngIf="task_name.errors.required">Task Name is required</div>
+          </div>
+
+        </div>
+
+        <!-- Priority -->
+        <div class="form-group">
+          
+          <span style="color: red">*</span><label>Priority:</label>   
+          
+          <select class='select-option' [formControl]="task_priority" name="priority" 
+              class="form-control" [ngClass]="{ 'is-invalid': submitted && task_priority.errors }">
+            <option [selected]="true == true" [ngValue]="0">Please Select</option>
+            <option class='option' *ngFor='let pr of priorityList' [ngValue]="pr">{{pr}}</option>
+          </select>
+          
+          <div *ngIf="submitted && task_priority.errors" class="invalid-feedback">
+              <div *ngIf="task_priority.errors.required">Priority is required</div>
+          </div>
+
+        </div>
+
+        <!-- Parent Task -->
+        <div class="form-group">
+          
+          <label>Parent Task:</label>
+          
+          <select class='select-option' [formControl]="task_parent" name="parent" 
+            class="form-control">
+            <option [selected]="true == true" [ngValue]="0">Please Select</option>
+            <option class='option' *ngFor='let task of taskList' [ngValue]="task | json">{{task.task}}</option>
+          </select>        
+
+        </div>
+
+        <!-- Start Date -->
+        <div class="form-group">
+          
+          <span style="color: red">*</span> <label>Start Date:</label>   
+          
+          <input type="date" [formControl]="task_stdt" name="startdate" 
+              class="form-control" [ngClass]="{ 'is-invalid': submitted && task_stdt.errors }" />
+          
+          <div *ngIf="submitted && task_stdt.errors" class="invalid-feedback">
+              <div *ngIf="task_stdt.errors.required">Start Date is required</div>
+          </div>
+
+        </div>
+
+        <!-- End Date -->
+        <div class="form-group">
+          
+          <span style="color: red">*</span> <label>End Date:</label>   
+          
+          <input type="date" [formControl]="task_enddt" name="enddate" 
+              class="form-control" [ngClass]="{ 'is-invalid': submitted && task_enddt.errors }" />
+          
+          <div *ngIf="submitted && task_stdt.errors" class="invalid-feedback">
+              <div *ngIf="task_enddt.errors.required">End Date is required</div>
+          </div>
+
+        </div>
+
+        <div class="form-group">
+            <input type="submit" value="Add Task" class="btn btn-primary">
+            <span> &nbsp;&nbsp;&nbsp;</span>
+            <input type="button" value="Reset" (click)="reset()" class="btn">
+        </div>
+
+      </form>
+
+    </div>
+  
+  </div>
+
+</div>
+
+  
