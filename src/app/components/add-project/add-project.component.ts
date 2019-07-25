@@ -42,30 +42,29 @@ export class AddProjectComponent implements OnInit {
 
   newProject: Project;  
 
-  ngOnInit() {
-    
-    this.retrieveAllUsers();  
-    this.retrieveAllProjects();
+  ngOnInit() {    
+
+      this.retrieveAllUsers();  
+      
+      this.retrieveAllProjects();      
+
+      this.addProjectForm = this.projectFormBuilder.group({
+          project: ['', Validators.required],
+          priority: ['', Validators.required],
+          startDate: ['', DateValidator.dateValidator],
+          endDate: ['', DateValidator.dateValidator]   
+      });
 
     // Pushing priority values 1 to 30
     for (var i = 1; i <= 30; i++) {
       this.priorityList.push(i);
     }
 
-    this.addProjectForm = this.projectFormBuilder.group({
-        project: ['', Validators.required],
-        priority: ['', Validators.required],
-        startDate: ['', DateValidator.dateValidator],
-        endDate: ['', DateValidator.dateValidator]   
-    });
-
     this.filteredManagerOptions = this.selectedManager.valueChanges
       .pipe(
         startWith(''),
         map(value => this._filterManager(value))
-      );
-
-    this.createManagerSearchList();    
+     );    
   }
 
   private _filterManager(value: string): string[] {
@@ -77,11 +76,20 @@ export class AddProjectComponent implements OnInit {
   get projectform() {return this.addProjectForm.controls;}
   
   retrieveAllProjects() {
-     this.projectsList = this.projectService.retrieveAllProjects();
+    
+     this.projectService.retrieveAllProjects()
+     .then(data => {
+       this.projectsList = data;
+    });
   }
 
-  retrieveAllUsers() {
-    this.managersList = this.userService.retrieveAllUsers();
+  retrieveAllUsers() {   
+
+      this.userService.retrieveAllUsers()
+      .then(data => {
+        this.managersList = data;  
+        this.createManagerSearchList();      
+       });      
   }
 
   sortresults(event) {
@@ -112,7 +120,13 @@ export class AddProjectComponent implements OnInit {
 
     if(this.areProjectInputsValid) {
       this.setValuesInNewProject();
-      alert('SUCCESS!! :-)\n\n New Project Values:: ' + JSON.stringify(this.newProject));     
+      
+      // Refreshing project list after adding the project
+      this.projectService.addProject(this.newProject).then(data => {
+        this.retrieveAllProjects();
+        this.reset();
+      });
+
     } 
 
   }
@@ -147,7 +161,7 @@ export class AddProjectComponent implements OnInit {
             //strtDte = moment(strtDteStr, 'YYYY-MM-DD', true);
             //endDte = moment(endDteStr, 'YYYY-MM-DD', true);
 
-            if(!(moment(endDteStr, 'YYYY-MM-DD', true).isAfter(moment(strtDteStr, 'YYYY-MM-DD', true)))) {
+            if(!(moment(endDteStr, 'YYYY/MM/DD', true).isAfter(moment(strtDteStr, 'YYYY/MM/DD', true)))) {
               this.addProjectForm.controls['endDate']
                 .setErrors({'invalidEndDate': true});
                 
@@ -155,7 +169,57 @@ export class AddProjectComponent implements OnInit {
             }
 
           }
+
+          let existingProject: Project = null;
+          let isManagerAlreadyAssigned: boolean = false;
+
+          let projectName: string = this.addProjectForm
+              .controls["project"].value;
+
+            this.projectsList.forEach(proj => {            
+              
+              if(proj.project == projectName) {
+                existingProject = proj;
+              }
+
+              if(proj.managerStr == this.selectedManager.value) {
+                isManagerAlreadyAssigned = true;
+              }
+            
+            });       
+
+          if(existingProject != null) {        
+            
+            this.addProjectForm.controls["project"].setErrors({
+              "alreadyExists": true            
+            });
+
+            this.areProjectInputsValid = false;
+          }
+
+          if(isManagerAlreadyAssigned) {
+            this.selectedManager.setErrors({
+              "alreadyAssigned": true});
+            this.areProjectInputsValid = false;
+          }
       }
+    }
+
+    suspendProject(projectId: number) {
+
+      let projectToSuspend: Project = null;
+
+      this.projectsList.forEach(proj => { 
+        if(proj.projectId == projectId) {
+          projectToSuspend = proj;          
+        }
+      });
+
+      // Refreshing project list after adding the project
+      this.projectService.suspendProject(projectToSuspend).then(data => {
+        this.retrieveAllProjects();   
+      });
+
     }
 
     setValuesInNewProject() {
@@ -165,6 +229,7 @@ export class AddProjectComponent implements OnInit {
       this.newProject.startDateStr=this.addProjectForm.controls["startDate"].value;
       this.newProject.endDateStr=this.addProjectForm.controls["endDate"].value;
       this.newProject.managerStr=this.selectedManager.value;
+      this.newProject.suspendFlag='N';
     }
 
     reset() {
@@ -176,5 +241,6 @@ export class AddProjectComponent implements OnInit {
       this.submitted = false;
     }
 
+    
 
 }

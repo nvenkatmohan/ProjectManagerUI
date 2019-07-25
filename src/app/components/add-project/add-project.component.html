@@ -17,6 +17,7 @@
                       [ngClass]="{ 'is-invalid': submitted && projectform.project.errors }" />
                   <div *ngIf="submitted && projectform.project.errors" class="invalid-feedback">
                       <div *ngIf="projectform.project.errors.required">Project is required</div>
+                      <div *ngIf="projectform.project.errors.alreadyExists">Project Already exists</div>
                   </div>
               </div>
           </div>
@@ -61,6 +62,9 @@
                     <mat-error *ngIf="submitted && selectedManager.hasError('required')">
                         Manager is required.
                     </mat-error>
+                    <mat-error *ngIf="submitted && selectedManager.hasError('alreadyAssigned')">
+                      Selected Manager was already assigned to different project.Please select other manager.
+                    </mat-error>
                 </mat-form-field>
 
               </div>
@@ -76,10 +80,10 @@
             <div class="form-group">
                   <label>Start Date</label>
                   <input type="text" formControlName="startDate" name="startDate" class="form-control" 
-                      placeholder= "YYYY-MM-DD" [ngClass]="{ 'is-invalid': submitted && projectform.startDate.errors }" />
+                      placeholder= "YYYY/MM/DD" [ngClass]="{ 'is-invalid': submitted && projectform.startDate.errors }" />
                   <div *ngIf="submitted && projectform.startDate.errors" class="invalid-feedback">
                       <div *ngIf="projectform.startDate.errors.dateValidator">
-                        Start Date should be in YYYY-MM-DD format
+                        Start Date should be in YYYY/MM/DD format
                       </div>
                       <div *ngIf="projectform.startDate.errors.startDateRequired">
                         Start Date is Required when End Date is entered
@@ -93,10 +97,10 @@
             <div class="form-group">
                   <label>End Date</label>
                   <input type="text" formControlName="endDate" name="endDate" class="form-control" 
-                     placeholder= "YYYY-MM-DD" [ngClass]="{ 'is-invalid': submitted && projectform.endDate.errors }" />
+                     placeholder= "YYYY/MM/DD" [ngClass]="{ 'is-invalid': submitted && projectform.endDate.errors }" />
                   <div *ngIf="submitted && projectform.endDate.errors" class="invalid-feedback">
                       <div *ngIf="projectform.endDate.errors.dateValidator">
-                        End Date should be in YYYY-MM-DD format
+                        End Date should be in YYYY/MM/DD format
                       </div>
                       <div *ngIf="projectform.endDate.errors.invalidEndDate">
                         End Date should be greater than Start Date
@@ -148,8 +152,8 @@
         <select #sortBy (change) = "sortresults($event)" class="form-control" name="sortBy" id="sortBy">
           <option value="0">Select</option>
           <option value="priority">Priority</option>
-          <option value="startDate">Start Date</option>
-          <option value="endDate">End Date</option>
+          <option value="startDateStr">Start Date</option>
+          <option value="endDateStr">End Date</option>
           <option value="completed">Completed</option>
         </select>
     </div>
@@ -184,17 +188,19 @@
                   | orderBy:sortBy.value ; let i = index">
 
                 <td> {{ project.project }} </td>
-                <td> {{ project.noOfTasks }} </td>
+                <td> {{ project.numberOfTasks }} </td>
                 <td> {{ project.priority }} </td>
                 <td> {{ project.startDateStr }} </td>
                 <td> {{ project.endDateStr }} </td>
                 <td> {{ project.completed }} </td>
                 
-                <td> <input type="button" value="Edit" (click)="routeToUpdateProject(project.projectId)" 
-                      class="btn btn-primary" /> </td>
+                <td *ngIf="project.suspendFlag != 'Y' && project.completed != 'Y'"> 
+                  <input type="button" value="Edit" (click)="routeToUpdateProject(project.projectId)" 
+                      class="btn btn-primary" /> 
+                </td>
 
-                <td *ngIf="project.completed != 'Y'"> 
-                  <input type="button" value="Suspend" class="btn btn-danger" />
+                <td *ngIf="project.suspendFlag != 'Y' && project.completed != 'Y'"> 
+                  <input type="button" value="Suspend" (click)="suspendProject(project.projectId)" class="btn btn-danger" />
                 </td>
 
            </tr>

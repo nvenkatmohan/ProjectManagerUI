@@ -9,48 +9,52 @@ export class UserService {
 
   constructor(private http: HttpClient) { }
 
-   retrieveAllUsers() {
+   retrieveAllUsers(): Promise<any> {
 
-    let usersList: any = [];
-
-    let user1: User = new User();
-    user1.userId = 225;
-    user1.firstName = 'Naveen';
-    user1.lastName = 'Mohan';
-    user1.employeeId = '127453';
-    
-    usersList.push(user1);
-
-    let user2: User = new User();
-    user2.userId = 290;
-    user2.firstName = 'Karthik';
-    user2.lastName = 'Balasubramani';
-    user2.employeeId = '184185';
-    
-    usersList.push(user2);
-
-    let user3: User = new User();
-    user3.userId = 222;
-    user3.firstName = 'Arun';
-    user3.lastName = 'Jeyaraman';
-    user3.employeeId = '152326';
-    
-    usersList.push(user3); 
-
-    return usersList; 
+    return this.http.get("http://localhost:8082/users/all")
+    .toPromise()
+    .then(res => res);   
   }
 
-  fetchUser(userId: number) {
+  fetchUser(userId: number): Promise<any> {    
     
-    let userToEdit: User = new User();
+    return this.http.get("http://localhost:8082/users/fetch/" + userId)
+     .toPromise()
+     .then(res => res);
+  }
 
-    userToEdit.userId = 290;
-    userToEdit.firstName = 'Karthik';
-    userToEdit.lastName = 'Balasubramani';
-    userToEdit.employeeId = '184185';
+  fetchUserByEmployeeId(employeeId: string): Promise<any> {    
+    
+    return this.http.get("http://localhost:8082/users/employee/" + employeeId)
+     .toPromise()
+     .then(res => res);
+  }
 
-    return userToEdit;
+  addUser(userToAdd: User): Promise<any> {
+    
+   return this.http.post("http://localhost:8082/users/adduser", userToAdd)
+      .toPromise()
+      .then(res => "User "+userToAdd.firstName+" "
+        +userToAdd.lastName+" added successfully");
+  }
+
+  updateUser(userToEdit: User): Promise<any> {
+
+    return this.http.put("http://localhost:8082/users", userToEdit)
+      .toPromise()
+      .then(res => "User "+userToEdit.firstName+" "
+      +userToEdit.lastName+" updated successfully")
+
+  }
+
+  deleteUser(userId: number): Promise<any> {    
+    
+    return this.http.delete("http://localhost:8082/users/" + userId)
+     .toPromise()
+     .then(res => res);
 
   }
 
 }
+
+

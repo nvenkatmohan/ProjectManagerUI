@@ -30,24 +30,23 @@ export class EditUserComponent implements OnInit {
       this.userIdToEdit = parameters["id"];
     });
 
+    this.fetchUserToEdit();
+
     this.editUserForm = this.userFormBuilder.group({
         employeeId: ['', Validators.required],
         firstName: ['', Validators.required],
         lastName: ['', Validators.required]       
-    });
-
-    this.fetchUserToEdit();
+    }); 
 
   }
 
   fetchUserToEdit() {
     
-    alert("User Id to Edit:: "+this.userIdToEdit);
-
-    this.userToEdit = 
-        this.userService.fetchUser(this.userIdToEdit);
-
-    this.setValuesInEditUserForm();
+    this.userService.fetchUser(this.userIdToEdit)
+    .then(data => {
+      this.userToEdit = data;
+      this.setValuesInEditUserForm();
+    });    
   }
 
   setValuesInEditUserForm() {
@@ -58,15 +57,17 @@ export class EditUserComponent implements OnInit {
 
   get userform() {return this.editUserForm.controls;}
 
-  onSubmit() {
-     
-     alert('Edit User Form Submitted');
+  onSubmit() {    
+   
      this.submitted = true;
 
      if(!this.editUserForm.invalid) {
         
         this.updateValuesInUser();
-        alert('Success:-) \n\n Updated User Values are:::' +JSON.stringify(this.userToEdit));
+       
+        this.userService.updateUser(this.userToEdit).then(data => {
+          this.router.navigate(['adduser']);
+        });
 
      }
   }

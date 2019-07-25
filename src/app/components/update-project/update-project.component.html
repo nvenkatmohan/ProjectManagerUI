@@ -15,6 +15,7 @@
                   [ngClass]="{ 'is-invalid': submitted && projectform.project.errors }" />
               <div *ngIf="submitted && projectform.project.errors" class="invalid-feedback">
                   <div *ngIf="projectform.project.errors.required">Project is required</div>
+                  <div *ngIf="projectform.project.errors.alreadyExists">Project Already exists</div>
               </div>
           </div> <!-- Project Div -->
 
@@ -81,8 +82,13 @@
               <mat-error *ngIf="submitted && selectedManager.hasError('required')">
                 Manager is required.
               </mat-error>
+              <mat-error *ngIf="submitted && selectedManager.hasError('alreadyAssigned')">
+                Manager already assigned to different project.
+              </mat-error>
             </mat-form-field>
           </div> <!-- Manager Div -->
+
+          <br/>
 
           <div class="form-group">        
             <div class="col-md-2">

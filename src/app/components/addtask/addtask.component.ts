@@ -1,8 +1,21 @@
 import { Component, OnInit } from '@angular/core';
-import { Task } from '../../model/task.model';
-import { TaskService } from '../../services/task.service';
+import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormGroup, FormBuilder, FormControl, AbstractControl, Validators } from '@angular/forms';
+
+import {Observable} from 'rxjs';
+import {map, startWith} from 'rxjs/operators';
+import * as moment from 'moment';
+
+import { UserService } from '../../services/user.service';
+import { ProjectService } from '../../services/project.service';
+import { TaskService } from '../../services/task.service';
+
+import { Task } from '../../model/task.model';
+import { Project } from '../../model/project.model';
+import { User } from '../../model/user.model';
+
+import { DateValidator } from '../../shared/date.validator';
 
 @Component({
   selector: 'app-addtask',
@@ -12,50 +25,61 @@ import { FormGroup, FormBuilder, FormControl, AbstractControl, Validators } from
 export class AddtaskComponent implements OnInit {
 
   submitted = false;
+  areTaskInputsValid = true;
   taskList: Array<Task> = []
   priorityList: Array<any> = [];
 
-  optionSelected: any;
-  prioritySelected: any;
-
   taskToAdd: Task = new Task();
-  parTask: Task;
 
-  myFrmGrp: FormGroup;
+  addTaskForm: FormGroup;
+  selectedUser = new FormControl('',[Validators.required]);
+  selectedProject = new FormControl('', [Validators.required]);
 
-  task_name: AbstractControl;
-  task_priority: AbstractControl;
-  task_parent: AbstractControl;
-  task_stdt: AbstractControl;
-  task_enddt: AbstractControl;
+  filteredUserOptions: Observable<string[]>;
+  filteredProjectOptions: Observable<string[]>;
 
-  task_name_str: string;
-  priority_str: string;
-  task_parent_str: string;
-  task_stdt_str: string;
-  task_enddt_str: string;
+  usersList: any = [];  
+  userSearchList: any = [];
+  projectsList: any = [];
+  projectsSearchList: any = [];
+  
 
-  constructor(fb: FormBuilder, private taskService: TaskService, private router: Router) {
+  constructor(fb: FormBuilder, private taskService: TaskService, 
+      private router: Router,private projectService: ProjectService, 
+      private userService: UserService) {
     // Initializing the form group and Form Controls
-    this.myFrmGrp = fb.group({
-      task_nme: ['', Validators.required],
-      task_prty: ['', Validators.required],
-      task_prnt: ['', Validators.required],
-      task_st_dt: ['', Validators.required],
-      task_end_dt: ['', Validators.required]
+    this.addTaskForm = fb.group({
+      task_name: ['', Validators.required],
+      task_priority: ['', Validators.required],
+      task_parent: [''],
+      task_start_date: ['', DateValidator.dateValidator],
+      task_end_date: ['', DateValidator.dateValidator]
     });
 
-    this.task_name = this.myFrmGrp.controls["task_nme"];
-    this.task_priority = this.myFrmGrp.controls["task_prty"];
-    this.task_parent = this.myFrmGrp.controls["task_prnt"];
-    this.task_stdt = this.myFrmGrp.controls["task_st_dt"];
-    this.task_enddt = this.myFrmGrp.controls["task_end_dt"];
   }
 
   ngOnInit() {
 
+    //Fetching all projects
+    this.retrieveAllProjects();
+
+    //Fetcing all users
+    this.retrieveAllUsers();   
+
     // Fetching all the tasks during init
     this.fetchAllTasks();
+
+    this.filteredProjectOptions = this.selectedProject.valueChanges
+    .pipe(
+      startWith(''),
+      map(value => this._filterProject(value))
+    );
+
+    this.filteredUserOptions = this.selectedUser.valueChanges
+      .pipe(
+        startWith(''),
+        map(value => this._filterUser(value))
+    );
 
     // Pushing priority values 1 to 30
     for (var i = 1; i <= 30; i++) {
@@ -63,67 +87,187 @@ export class AddtaskComponent implements OnInit {
     }
   }
 
+  get taskform() {return this.addTaskForm.controls;}
+
+  private _filterUser(user: string): string[] {
+    const filterValue = user.toLowerCase(); 
+    return this.userSearchList.filter(option => option.toLowerCase().includes(filterValue));
+  }
+
+  private _filterProject(project: string): string[] {
+    const filterValue = project.toLowerCase();
+    return this.projectsSearchList.filter(option => option.toLowerCase().includes(filterValue));
+  }
+
+
   // Fetching all the tasks from the Service
   fetchAllTasks() {
     this.taskService.fetchAllTasks()
       .then(data => {
         this.taskList = data
+        console.log(this.taskList);
       })
   }
 
   saveTask(): void {
 
     this.submitted = true;
+    this.areTaskInputsValid = true;
 
-    this.task_name_str = this.task_name.value;
-    this.priority_str = this.task_priority.value;
-    this.task_parent_str = this.task_parent.value;
-    this.task_stdt_str = this.task_stdt.value;
-    this.task_enddt_str = this.task_enddt.value;
+    alert('Inside Save task');
 
-    if(this.myFrmGrp.invalid) {    
-          return;
+    this.validateAddTaskInput();
+    
+    if(this.areTaskInputsValid) {
+      this.addTask();
+    }
+  }
+
+  validateAddTaskInput() {
+    
+    if(this.addTaskForm.controls['task_priority'].value == 0) {
+      this.addTaskForm.controls['task_priority'].setErrors({'incorrect': true});
+    }
+
+    if(this.addTaskForm.invalid || this.selectedUser.value == ''
+        || this.selectedProject.value == '') {
+        this.areTaskInputsValid = false;
+    }               
+
+    if(this.areTaskInputsValid) {
+      
+      //Start Date and End Date validation
+      let strtDteStr = this.addTaskForm.controls['task_start_date'].value;
+      let endDteStr = this.addTaskForm.controls['task_end_date'].value;
+
+      if(endDteStr != '' && strtDteStr == '') {            
+        this.addTaskForm.controls['task_start_date']
+            .setErrors({'startDateRequired': true});
+        
+        this.areTaskInputsValid = false;
+
+      } else if(endDteStr != '') {       
+
+        if(!(moment(endDteStr, 'YYYY/MM/DD', true).isAfter(moment(strtDteStr, 'YYYY/MM/DD', true)))) {
+          this.addTaskForm.controls['task_end_date']
+            .setErrors({'invalidEndDate': true});
+            
+          this.areTaskInputsValid = false;
+        }
+
       }
 
-    this.addTask(this.task_name_str, this.priority_str, this.task_parent_str, this.task_stdt_str, this.task_enddt_str);
+      let existingTask: Task = null;
+      let isUserAlreadyAssigned: boolean = false;
+
+      let taskNme: string = this.addTaskForm
+          .controls["task_name"].value;
+
+        this.taskList.forEach(task => {            
+          
+          if(task.taskName.toLowerCase() == taskNme.toLowerCase()) {
+            existingTask = task;
+          }
+
+           if(task.userString == this.selectedUser.value) {
+              isUserAlreadyAssigned = true;
+          } 
+        
+        });       
+
+      if(existingTask != null) {        
+        
+        this.addTaskForm.controls["task_name"].setErrors({
+          "alreadyExists": true            
+        });
+
+        this.areTaskInputsValid = false;
+      }
+
+      if(isUserAlreadyAssigned) {
+        this.selectedUser.setErrors({
+          "alreadyAssigned": true});
+        this.areTaskInputsValid = false;
+      } 
+    }
   }
 
   // Save the task by Service
-  addTask(task: string, priority: string, parentStr: string, startDate: string, endDate: string) {
+  addTask() {
 
     this.taskToAdd.taskId = null;
-    this.taskToAdd.task = task;
-    this.taskToAdd.priority = parseInt(priority);
-    this.taskToAdd.startDateStr = startDate;
-    this.taskToAdd.endDateStr = endDate;
+    this.taskToAdd.taskName = this.addTaskForm.controls["task_name"].value;
+    this.taskToAdd.priority = parseInt(this.addTaskForm.controls["task_priority"].value);
+    this.taskToAdd.startDateStr = this.addTaskForm.controls["task_start_date"].value;
+    this.taskToAdd.endDateStr = this.addTaskForm.controls["task_end_date"].value;
     this.taskToAdd.deleteFlag = 'N';
+
+    let parentStr: string = this.addTaskForm.controls["task_parent"].value;
 
     // Check if Parent task is selected or not
     if ('' == parentStr) {
-      this.taskToAdd.parentId = null;
-      this.taskToAdd.parentTaskName = null;
+     this.taskToAdd.parentTaskName = null;
     } else {
-      let task1 = JSON.parse(parentStr);
-      this.parTask = task1 as Task;
-
-      this.taskToAdd.parentId = this.parTask.taskId;
-      this.taskToAdd.parentTaskName = this.parTask.task;
+      this.taskToAdd.parentTaskName = parentStr;
     }
+
+    this.taskToAdd.userString = this.selectedUser.value;
+    this.taskToAdd.projectName = this.selectedProject.value;
+
+    alert('Submitted Task:::: '+JSON.stringify(this.taskToAdd));
 
     // Redirecting to Homepage after adding the task
     this.taskService.addTask(this.taskToAdd).then(data => {
       this.router.navigate(['viewtask']);
-    });
+    }); 
 
+  }
+
+  retrieveAllProjects() {
+    
+     this.projectService.retrieveAllProjects()
+     .then(data => {
+       this.projectsList = data;
+       this.createProjectSearchList();
+    });
+  }
+
+  createProjectSearchList() {    
+    if(this.projectsList != null) {
+      this.projectsList.forEach( proj => {
+          if(proj.suspendFlag != 'Y' && proj.completed != 'Y')
+            this.projectsSearchList.push(proj.project);          
+      });
+    }
+  }
+
+  retrieveAllUsers() {   
+
+      this.userService.retrieveAllUsers()
+      .then(data => {
+        this.usersList = data;  
+        this.createManagerSearchList();      
+       });      
+  }
+
+  createManagerSearchList() {    
+    if(this.usersList != null) {
+      this.usersList.forEach( user => {
+          this.userSearchList.push(user.employeeId + ' - ' +
+            user.firstName + ' '+ user.lastName);
+      });
+    }
   }
 
   reset() {
     //empty the form elements
-    this.myFrmGrp.controls["task_nme"].setValue("");
-    this.myFrmGrp.controls["task_prty"].setValue(0);
-    this.myFrmGrp.controls["task_prnt"].setValue(0);
-    this.myFrmGrp.controls["task_st_dt"].setValue("");
-    this.myFrmGrp.controls["task_end_dt"].setValue("");
+    this.addTaskForm.controls["task_name"].setValue('');
+    this.addTaskForm.controls["task_priority"].setValue(0);
+    this.addTaskForm.controls["task_parent"].setValue(0);
+    this.addTaskForm.controls["task_start_date"].setValue('');
+    this.addTaskForm.controls["task_end_date"].setValue('');
+    this.selectedUser.setValue('');
+    this.selectedProject.setValue('');
   }
 
 }

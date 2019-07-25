@@ -21,9 +21,8 @@ export class AddUserComponent implements OnInit {
   submitted = false;
   
   addUserForm: FormGroup;
-  userFormControl = new FormControl('',[Validators.required]);
-  
-  filteredUserOptions: Observable<string[]>;
+  userToAdd: User;  
+  existingUser: User;
 
   constructor(private userFormBuilder: FormBuilder, 
       private router: Router, private userService: UserService) { }
@@ -36,56 +35,84 @@ export class AddUserComponent implements OnInit {
         employeeId: ['', Validators.required]
     });
 
-    this.retrieveAllUsers();
-
-    this.createUserSearchList();
-
-    this.filteredUserOptions = this.userFormControl.valueChanges
-      .pipe(
-        startWith(''),
-        map(value => this._filter(value))
-      );
+    this.retrieveAllUsers();    
   }
-
-  private _filter(value: string): string[] {
-    const filterValue = value.toLowerCase();
- 
-    return this.userSearchList.filter(option => option.toLowerCase().includes(filterValue));
-  }
+  
 
   get uf() {return this.addUserForm.controls;}
 
   onSubmit() {
     
-    this.submitted = true;
+    this.submitted = true; 
+    let existingUser: User = null;
+    
+    if(!this.addUserForm.invalid) {
+      
+      let employeeId: string = this.addUserForm
+                  .controls["employeeId"].value;
 
-    console.log('Selected User: '+this.userFormControl.value);
+      this.usersList.forEach(user => {
+        if(user.employeeId == employeeId) {
+          existingUser = user;
+        }
+      });     
 
-    if(this.addUserForm.invalid || this.userFormControl.value == '') {
-      return;
-    }
+      if(existingUser != null) {        
+        this.addUserForm.controls["employeeId"].setErrors({
+          "alreadyExists": true
+        });
 
-    //alert('SUCCESS!! :-)\n\n' + JSON.stringify(this.addUserForm.value));
-    //alert('User Selected:: '+this.userFormControl.value);
+        return;
+      }
+      
+      this.setValuesForNewUser();     
+
+      // Refreshing user list after adding the user
+      this.userService.addUser(this.userToAdd).then(data => {
+        this.retrieveAllUsers();
+        this.resetForm();
+      });
+    }    
+  }
+
+  setValuesForNewUser() {
+    
+    this.userToAdd = new User();
+
+    this.userToAdd.firstName = this.addUserForm.controls["firstName"].value;
+    this.userToAdd.lastName = this.addUserForm.controls["lastName"].value;
+    this.userToAdd.employeeId = this.addUserForm.controls["employeeId"].value;
+  }
+
+  deleteUser(userId: number) {
+
+    // Deleting  user
+    this.userService.deleteUser(userId).then(data => {
+      this.retrieveAllUsers();      
+    });
   }
 
   retrieveAllUsers() {
-    this.usersList = this.userService.retrieveAllUsers();
+    
+    this.userService.retrieveAllUsers()
+      .then(data => {
+        this.usersList = data
+    });
+
   }
   
+  resetForm() {
+
+    this.addUserForm.controls['firstName'].setValue('');
+    this.addUserForm.controls['lastName'].setValue(''); 
+    this.addUserForm.controls['employeeId'].setValue('');
+
+    this.submitted = false;
+  }
+
   sortresults(event) {
     console.log(event);
-  }
-
-  createUserSearchList() {
-
-    if(this.usersList != null) {
-      this.usersList.forEach( user => {
-          this.userSearchList.push(user.employeeId + ' - ' +
-            user.firstName + ' '+ user.lastName);
-      });
-    }
-  }
+  }  
 
   routeToEditUser(userId: number) {
     this.router.navigate(['edituser/' + userId]);

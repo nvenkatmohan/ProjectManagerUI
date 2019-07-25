@@ -6,55 +6,28 @@ import { Task } from '../model/task.model';
   name: 'search'
 })
 export class SearchPipe implements PipeTransform {
+  
+  transform(taskList: Array<Task>,  
+      searchValue: string) {
 
-  transform(
-    tasks: Array<Task>,
-    taskname?: string,
-    parenttask?: string,
-    priorityFrom?: number,
-    priorityTo?: number,
-    startDate?: string,
-    endDate?: string) {
+     taskList = taskList.filter(task =>    
+        
+            task.projectName.toLowerCase()
+                  .includes(searchValue.toLowerCase())
+        
+     );
 
-    // Filter Task name
-    tasks = tasks.filter(task => task.task.toLowerCase().includes(taskname.toLowerCase()));
-    // Filter parent task
-    tasks = tasks.filter(task => task.parentTaskName.toLowerCase().includes(parenttask.toLowerCase()));
-
-    // Filter Priority From
-    tasks = tasks.filter(task => {
-      if (!priorityFrom)
-        priorityFrom = 0;
-
-      if (task.priority >= priorityFrom)
-        return true;
-    });
-
-    // Filter Priority To
-    tasks = tasks.filter(task => {
-      if (!priorityTo)
-        priorityTo = 30;
-
-      if (task.priority <= priorityTo)
-        return true;
-    });
-
-    // Filter Start Date
-    if (typeof startDate !== 'undefined' && startDate !== '') {
-      tasks = tasks.filter(task => {
-        if (task.startDateStr == startDate)
-          return true;
-      });
-    }
-
-    // Filter End Date
-    if (typeof endDate !== 'undefined' && endDate !== '') {
-      tasks = tasks.filter(task => {
-        if (task.endDateStr == endDate)
-          return true;
-      });
-    }
-
-    return tasks;
+      return taskList;    
   }
+
+//   transform(projects: Array<Project>,  
+//     searchValue: string) {
+
+//     projects = projects.filter(project => project.project.toLowerCase()
+//                 .includes(searchValue.toLowerCase()));
+        
+//     return projects;
+// }
+  
 }
+  

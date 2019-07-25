@@ -4,11 +4,12 @@ export class Project {
     project: string;
     parentTaskName: string;
     managerStr: string;
-    noOfTasks: number;
+    numberOfTasks: number;
     priority: number;
     startDateStr: string;
     endDateStr: string;
     completed: string;
+    suspendFlag: string;
 
     constructor() {
         

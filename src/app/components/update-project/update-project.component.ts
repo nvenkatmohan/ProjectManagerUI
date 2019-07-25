@@ -24,6 +24,7 @@ export class UpdateProjectComponent implements OnInit {
   projectIdToUpdate: number;
   projectToUpdate: Project;
 
+  projectsList: any = [];
   managersList: any = [];
   managerSearchList: any = [];
   priorityList: Array<any> = [];
@@ -47,7 +48,8 @@ export class UpdateProjectComponent implements OnInit {
       this.projectIdToUpdate = parameters["id"];
     });
 
-    this.retrieveAllUsers();
+    this.retrieveAllUsers(); 
+    this.retrieveAllProjects();
 
     // Pushing priority values 1 to 30
     for (var i = 1; i <= 30; i++) {
@@ -67,16 +69,26 @@ export class UpdateProjectComponent implements OnInit {
       .pipe(
         startWith(''),
         map(value => this._filterManager(value))
-    );
-    
-    this.createManagerSearchList();
-
+    );    
+  
   }
 
   get projectform() {return this.updateProjectForm.controls;}
 
   retrieveAllUsers() {
-    this.managersList = this.userService.retrieveAllUsers();
+    this.userService.retrieveAllUsers()
+    .then(data => {
+      this.managersList = data;  
+      this.createManagerSearchList();      
+     });   
+  }
+
+  retrieveAllProjects() {
+    
+     this.projectService.retrieveAllProjects()
+     .then(data => {
+       this.projectsList = data;
+    });
   }
 
   createManagerSearchList() {
@@ -90,17 +102,23 @@ export class UpdateProjectComponent implements OnInit {
   }
 
   private _filterManager(value: string): string[] {
-    const filterValue = value.toLowerCase();
+    
+    if(value != null) {
+
+      const filterValue = value.toLowerCase();
  
-    return this.managerSearchList.filter(
+      return this.managerSearchList.filter(
         option => option.toLowerCase().includes(filterValue));
+    }
   }
 
   fetchProjectToUpdate() {
-    this.projectToUpdate = 
-        this.projectService.fetchProject(this.projectIdToUpdate);
-
-    this.setValuesInUpdateProjectForm();
+ 
+    this.projectService.fetchProject(this.projectIdToUpdate)
+      .then(data => {
+        this.projectToUpdate = data;
+        this.setValuesInUpdateProjectForm();
+      });    
   }
 
   setValuesInUpdateProjectForm() {
@@ -121,9 +139,12 @@ export class UpdateProjectComponent implements OnInit {
     this.validateProjectInput();
 
     if(this.areProjectInputsValid) {
+      
       this.updateValuesInProject();
 
-      alert('Success::::: Updated Project Values are:::' +JSON.stringify(this.projectToUpdate));
+      this.projectService.updateProject(this.projectToUpdate).then(data => {
+        this.router.navigate(['addproject']);
+      });
     }
 
 
@@ -134,8 +155,11 @@ export class UpdateProjectComponent implements OnInit {
     if(this.updateProjectForm.controls['priority'].value == 0) {
       this.updateProjectForm.controls['priority'].setErrors({'incorrect': true});
     }
+    
+    alert('Selected Manager'+this.selectedManager.value);
 
-    if(this.updateProjectForm.invalid || this.selectedManager.value == '') {
+    if(this.updateProjectForm.invalid || this.selectedManager.value == ''
+          || this.selectedManager.value == null) {
         this.areProjectInputsValid = false;
     }               
 
@@ -158,13 +182,44 @@ export class UpdateProjectComponent implements OnInit {
             //strtDte = moment(strtDteStr, 'YYYY-MM-DD', true);
             //endDte = moment(endDteStr, 'YYYY-MM-DD', true);
 
-            if(!(moment(endDteStr, 'YYYY-MM-DD', true).isAfter(moment(strtDteStr, 'YYYY-MM-DD', true)))) {
+            if(!(moment(endDteStr, 'YYYY/MM/DD', true).isAfter(moment(strtDteStr, 'YYYY/MM/DD', true)))) {
               this.updateProjectForm.controls['endDate']
                 .setErrors({'invalidEndDate': true});
                 
               this.areProjectInputsValid = false;
             }
 
+          }
+
+          let existingProject: Project = null;
+          let isManagerAlreadyAssigned: boolean = false;
+          
+          let projectName: string = this.updateProjectForm
+              .controls["project"].value;
+        
+          this.projectsList.forEach(proj => {
+            if(proj.project != this.projectToUpdate.project) { 
+              
+              if(proj.project == projectName) {
+                existingProject = proj;
+              }
+
+              if(proj.managerStr == this.selectedManager.value) {
+                isManagerAlreadyAssigned = true;
+              }
+            }
+          });     
+
+          if(existingProject != null) {            
+            this.updateProjectForm.controls["project"].setErrors({
+              "alreadyExists": true});
+            this.areProjectInputsValid = false;
+          }
+
+          if(isManagerAlreadyAssigned) {
+            this.selectedManager.setErrors({
+              "alreadyAssigned": true});
+            this.areProjectInputsValid = false;
           }
       }
   }

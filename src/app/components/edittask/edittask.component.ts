@@ -1,10 +1,21 @@
 import { Component, OnInit } from '@angular/core';
-
+import { DatePipe } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormGroup, FormBuilder, FormControl, AbstractControl, Validators } from '@angular/forms';
 
+import {Observable} from 'rxjs';
+import {map, startWith} from 'rxjs/operators';
+import * as moment from 'moment';
+
+import { UserService } from '../../services/user.service';
+import { ProjectService } from '../../services/project.service';
 import { TaskService } from '../../services/task.service';
+
+import { Project } from '../../model/project.model';
+import { User } from '../../model/user.model';
 import { Task } from '../../model/task.model';
+
+import { DateValidator } from '../../shared/date.validator';
 
 @Component({
   selector: 'app-edittask',
@@ -13,97 +24,117 @@ import { Task } from '../../model/task.model';
 })
 export class EdittaskComponent implements OnInit {
 
-  taskList: Array<Task> = [];
-  nonDeletedTaskList: Array<Task> = [];
-  priorityList: Array<any> = [];
-
-  taskToUpdate: Task = new Task();
-  parTask: Task;
-
-  isReadOnly: boolean = false;
   submitted = false;
+  areTaskInputsValid = true;
+  taskList: Array<Task> = [];
+  priorityList: Array<any> = []; 
+  
+  taskIdToUpdate: number;
+  taskToUpdate: Task = new Task();
+  
+  updateTaskForm: FormGroup;
+  selectedUser = new FormControl('',[Validators.required]);
+  selectedProject = new FormControl('', [Validators.required]);
 
-  id: number;
+  filteredUserOptions: Observable<string[]>;
+  filteredProjectOptions: Observable<string[]>;
 
-  myFrmGrp: FormGroup;
-
-  task_name: AbstractControl;
-  task_priority: AbstractControl;
-  task_parent: AbstractControl;
-  task_stdt: AbstractControl;
-  task_enddt: AbstractControl;
-
-  task_name_str: string;
-  priority_str: string;
-  task_parent_str: string;
-  task_stdt_str: string;
-  task_enddt_str: string;
-
-  prev_task_parent_str: string;
+  usersList: any = [];  
+  userSearchList: any = [];
+  projectsList: any = [];
+  projectsSearchList: any = [];
 
   constructor(fb: FormBuilder, private taskService: TaskService, private router: Router,
-    private route: ActivatedRoute) {
+    private route: ActivatedRoute, private projectService: ProjectService, 
+    private userService: UserService) {
 
     // Getting the task id from the request Parameter
     this.route.params.subscribe((parameters) => {
-      this.id = parameters["id"];
+      this.taskIdToUpdate = parameters["id"];
     });
 
-    // Creating the Form group and Form Controls
-    this.myFrmGrp = fb.group({
-      "task_nme": ["", Validators.required],
-      "task_prty": ["", Validators.required],
-      "task_prnt": ["", Validators.required],
-      "task_st_dt": ["", Validators.required],
-      "task_end_dt": ["", Validators.required]
+    // Initializing the form group and Form Controls
+    this.updateTaskForm = fb.group({
+      task_name: ['', Validators.required],
+      task_priority: ['', Validators.required],
+      task_parent: [''],
+      task_start_date: ['', DateValidator.dateValidator],
+      task_end_date: ['', DateValidator.dateValidator]
     });
-
-    this.task_name = this.myFrmGrp.controls["task_nme"];
-    this.task_priority = this.myFrmGrp.controls["task_prty"];
-    this.task_parent = this.myFrmGrp.controls["task_prnt"];
-    this.task_stdt = this.myFrmGrp.controls["task_st_dt"];
-    this.task_enddt = this.myFrmGrp.controls["task_end_dt"];
+    
   }
 
   ngOnInit() {
 
+    //Fetching all projects
+     this.retrieveAllProjects();
+     
+    //Fetcing all users
+    this.retrieveAllUsers();  
+
     // Fetching all the tasks during init
-    this.fetchAllTasks();
+    this.fetchAllTasks();    
+
+    this.filteredProjectOptions = this.selectedProject.valueChanges
+    .pipe(
+      startWith(''),
+      map(value => this._filterProject(value))
+    );
+
+    this.filteredUserOptions = this.selectedUser.valueChanges
+      .pipe(
+        startWith(''),
+        map(value => this._filterUser(value))
+    );
+
+    // Fetch specific task
+    this.taskService.fetchTask(this.taskIdToUpdate)
+      .then(data => {    
+        this.taskToUpdate = data;
+        this.setValuesInUpdateTaskForm();
+    });
 
     // Pushing priority values 1 to 30
     for (var i = 1; i <= 30; i++) {
       this.priorityList.push(i);
+    }         
+  }
+
+  setValuesInUpdateTaskForm() {
+    
+    this.updateTaskForm.controls["task_name"].setValue(this.taskToUpdate.taskName);
+    this.updateTaskForm.controls["task_priority"].setValue(this.taskToUpdate.priority);
+    this.updateTaskForm.controls["task_start_date"].setValue(this.taskToUpdate.startDateStr);
+    this.updateTaskForm.controls["task_end_date"].setValue(this.taskToUpdate.endDateStr);
+    
+    if(this.taskToUpdate.parentTaskName != 'No Parent Task') {
+      this.updateTaskForm.controls["task_parent"].setValue(this.taskToUpdate.parentTaskName);
+    } else {
+      this.updateTaskForm.controls["task_parent"].setValue('0');
+    }
+    
+    if(this.taskToUpdate.userString != null) {
+      this.selectedUser.setValue(this.taskToUpdate.userString);
+    } else {
+      this.selectedUser.setValue('');
     }
 
-    // Fetch specific task
-    this.taskService.fetchTask(this.id)
-      .then(data => {
-        
-        this.taskToUpdate = data;
+    this.selectedProject.setValue(this.taskToUpdate.projectName);
+    
+  }
 
-        if (this.taskToUpdate.parentTaskName == 'This task has no Parent') {
-          this.taskToUpdate.parentTaskName = 'Please Select';
-        }
+  get taskform() {return this.updateTaskForm.controls;}
+  
+  private _filterUser(user: string): string[] {
+    if(user != null) {
+      const filterValue = user.toLowerCase(); 
+      return this.userSearchList.filter(option => option.toLowerCase().includes(filterValue));
+    }
+  }
 
-        // Set the read only flag based on the delete flag
-        if (this.taskToUpdate.deleteFlag == 'Y') {
-          this.isReadOnly = true;
-
-          // disabling the form group if the task has been ended
-          this.myFrmGrp.disable();
-        }
-
-        this.task_name.setValue(this.taskToUpdate.task);
-        this.task_priority.setValue(this.taskToUpdate.priority);
-        this.task_parent.setValue(this.taskToUpdate.parentTaskName);
-        this.task_stdt.setValue(this.taskToUpdate.startDateStr);
-        this.task_enddt.setValue(this.taskToUpdate.endDateStr);
-
-        this.prev_task_parent_str = this.taskToUpdate.parentTaskName;
-
-      });   
-
-         
+  private _filterProject(project: string): string[] {
+    const filterValue = project.toLowerCase();
+    return this.projectsSearchList.filter(option => option.toLowerCase().includes(filterValue));
   }
 
   // Fetch all the tasks
@@ -116,64 +147,171 @@ export class EdittaskComponent implements OnInit {
 
   // Update the task
   updateTask(): void {
-
-    this.submitted = true;
-
-    this.task_name_str = this.task_name.value;
-    this.priority_str = this.task_priority.value;
-    this.task_parent_str = this.task_parent.value;
-    this.task_stdt_str = this.task_stdt.value;
-    this.task_enddt_str = this.task_enddt.value;
     
-    if(this.myFrmGrp.invalid) {    
-        return;
-    }
+    this.submitted = true;
+    this.areTaskInputsValid = true;
 
-    this.editTask(this.task_name_str, this.priority_str, this.task_parent_str, this.task_stdt_str, this.task_enddt_str);
+    this.validateTaskInput();
+    
+    if(this.areTaskInputsValid) {
+      
+      this.updateTaskDetails();
+
+      this.taskService.updateTask(this.taskToUpdate).then(data => {
+        this.router.navigate(['viewtask']);
+      });
+
+    }   
   }
 
-  // Update the task by Service
-  editTask(task: string, priority: string, parentStr: string, startDate: string, endDate: string) {
-
-    if ('' !== task) {
-      this.taskToUpdate.task = task;
+  validateTaskInput() {
+    
+    if(this.updateTaskForm.controls['task_priority'].value == 0) {
+      this.updateTaskForm.controls['task_priority'].setErrors({'incorrect': true});
     }
 
-    if ('' !== priority) {
-      this.taskToUpdate.priority = parseInt(priority);
-    }
+    if(this.updateTaskForm.invalid || this.selectedUser.value == ''
+        || this.selectedProject.value == '') {
+        this.areTaskInputsValid = false;
+    }               
 
-    if ('' !== startDate) {
-      this.taskToUpdate.startDateStr = startDate;
-    }
+    if(this.areTaskInputsValid) {
+      
+      //Start Date and End Date validation
+      let strtDteStr = this.updateTaskForm.controls['task_start_date'].value;
+      let endDteStr = this.updateTaskForm.controls['task_end_date'].value;
 
-    if ('' !== endDate) {
-      this.taskToUpdate.endDateStr = endDate;
-    }
+      if(endDteStr != '' && strtDteStr == '') {            
+        this.updateTaskForm.controls['task_start_date']
+            .setErrors({'startDateRequired': true});
+        
+        this.areTaskInputsValid = false;
 
+      } else if(endDteStr != '') {       
+
+        if(!(moment(endDteStr, 'YYYY/MM/DD', true).isAfter(moment(strtDteStr, 'YYYY/MM/DD', true)))) {
+          this.updateTaskForm.controls['task_end_date']
+            .setErrors({'invalidEndDate': true});
+            
+          this.areTaskInputsValid = false;
+        }
+
+      }
+
+      if(this.updateTaskForm.controls["task_parent"].value.toLowerCase() == 
+          this.updateTaskForm.controls["task_name"].value.toLowerCase()) {
+            
+            this.updateTaskForm.controls["task_parent"]
+              .setErrors({'sameTask': true});
+
+            this.areTaskInputsValid = false;
+      }
+
+      let existingTask: Task = null;
+      let isUserAlreadyAssigned: boolean = false;
+
+      let taskNme: string = this.updateTaskForm
+          .controls["task_name"].value;
+
+        this.taskList.forEach(task => {            
+          
+          if(task.taskName.toLowerCase() 
+              != this.taskToUpdate.taskName.toLowerCase()) {
+
+            if(task.taskName.toLowerCase() == taskNme.toLowerCase()) {
+              existingTask = task;
+            }
+
+            if(task.userString == this.selectedUser.value) {
+                isUserAlreadyAssigned = true;
+            }
+
+          }
+        
+        });       
+
+      if(existingTask != null) {        
+        
+        this.updateTaskForm.controls["task_name"].setErrors({
+          "alreadyExists": true            
+        });
+
+        this.areTaskInputsValid = false;
+      }
+
+      if(isUserAlreadyAssigned) {
+        this.selectedUser.setErrors({
+          "alreadyAssigned": true});
+        this.areTaskInputsValid = false;
+      } 
+    }
+  }
+
+  // Save the task by Service
+  updateTaskDetails() {
+    
+    //this.taskToUpdate.taskId = null;
+    this.taskToUpdate.taskName = this.updateTaskForm.controls["task_name"].value;
+    this.taskToUpdate.priority = parseInt(this.updateTaskForm.controls["task_priority"].value);
+    this.taskToUpdate.startDateStr = this.updateTaskForm.controls["task_start_date"].value;
+    this.taskToUpdate.endDateStr = this.updateTaskForm.controls["task_end_date"].value;
     this.taskToUpdate.deleteFlag = 'N';
 
-    
+    let parentStr: string = this.updateTaskForm.controls["task_parent"].value;
 
-    if ('' !== parentStr && 'Please Select' != parentStr && 
-          this.prev_task_parent_str != parentStr) {
-
-      let task1 = JSON.parse(parentStr);
-      this.parTask = task1 as Task;      
-
-      this.taskToUpdate.parentId = this.parTask.taskId;
-      this.taskToUpdate.parentTaskName = this.parTask.task;
+    // Check if Parent task is selected or not
+    if ('' == parentStr) {
+      this.taskToUpdate.parentTaskName = null;
+    } else {
+      this.taskToUpdate.parentTaskName = parentStr;
     }
 
-    this.taskService.updateTask(this.taskToUpdate).then(data => {
-      this.router.navigate(['viewtask']);
-    });
+    this.taskToUpdate.userString = this.selectedUser.value;
+    this.taskToUpdate.projectName = this.selectedProject.value;
 
+    alert('Updated Task:::: '+JSON.stringify(this.taskToUpdate));  
+    
   }
 
   // Redirecting to the homescreen on clicking Cancel
   cancel() {
     this.router.navigate(['viewtask']);
+  }  
+
+  retrieveAllProjects() {
+    
+     this.projectService.retrieveAllProjects()
+     .then(data => {
+       this.projectsList = data;
+       this.createProjectSearchList();
+    });
+  }
+
+  createProjectSearchList() {    
+    if(this.projectsList != null) {
+      this.projectsList.forEach( proj => {
+          if(proj.suspendFlag != 'Y' && proj.completed != 'Y')
+            this.projectsSearchList.push(proj.project);          
+      });
+    }
+  }
+
+  retrieveAllUsers() {   
+
+      this.userService.retrieveAllUsers()
+      .then(data => {
+        this.usersList = data;  
+        this.createManagerSearchList();      
+       });      
+  }
+
+  createManagerSearchList() {    
+    if(this.usersList != null) {
+      this.usersList.forEach( user => {
+          this.userSearchList.push(user.employeeId + ' - ' +
+            user.firstName + ' '+ user.lastName);
+      });
+    }
   }
 
 }

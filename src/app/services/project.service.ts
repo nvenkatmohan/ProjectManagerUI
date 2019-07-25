@@ -10,40 +10,18 @@ export class ProjectService {
 
  constructor(private http: HttpClient) { }
   
-  retrieveAllProjects() {
+  retrieveAllProjects(): Promise<any> {
     
-    let projectsList: any = [];
-
-    let proj1: Project = new Project();
-    proj1.project='Some Project';
-    proj1.projectId= 1234;
-    proj1.priority = 10;
-    proj1.startDateStr= '2019/08/01';
-    proj1.endDateStr = '2019/12/31';
-    proj1.noOfTasks = 2;
-    proj1.completed = 'N';
-
-    projectsList.push(proj1);
-
-    let proj2: Project = new Project();
-    proj2.project='A2B';
-    proj2.projectId= 5678;
-    proj2.priority = 5;
-    proj2.startDateStr= '2019/01/01';
-    proj2.endDateStr = '2019/05/31';
-    proj2.noOfTasks = 4;
-    proj2.completed = 'Y';
-
-    projectsList.push(proj2);
-
-    return projectsList;
+    return this.http.get("http://localhost:8082/projects/all")
+      .toPromise()
+      .then(res => res);  
   }
 
 
   // Fetch specific project by project id
-  fetchProject(projectId: number) {
+  fetchProject(projectId: number): Promise<any> {
 
-    let projToUpdate: Project = new Project();
+    /** let projToUpdate: Project = new Project();
     projToUpdate.project='Some Project';
     projToUpdate.projectId= 1234;
     projToUpdate.priority = 25;
@@ -53,8 +31,36 @@ export class ProjectService {
     projToUpdate.completed = 'N';
     projToUpdate.managerStr = '127453 - Naveen Mohan';
 
-    return projToUpdate;
+    return projToUpdate; **/
+
+    return this.http.get("http://localhost:8082/projects/fetch/" +projectId)
+    .toPromise()
+    .then(res => res);  
 
   }
+
+  addProject(projectToAdd: Project): Promise<any> {
+    
+   return this.http.post("http://localhost:8082/projects/addproject", projectToAdd)
+      .toPromise()
+      .then(res => "Project "+projectToAdd.project+
+        " added successfully");
+  }
+
+  updateProject(projectToUpdate: Project): Promise<any> {
+
+    return this.http.put("http://localhost:8082/projects", projectToUpdate)
+    .toPromise()
+    .then(res => "Project "+projectToUpdate.project+
+      " updated successfully");
+  }
+
+  suspendProject(projectToSuspend: Project): Promise<any> {
+
+    return this.http.put("http://localhost:8082/projects/suspend",projectToSuspend)
+      .toPromise().then(res =>
+        "Project "+projectToSuspend.project+" has been suspended");
+  }
+  
 
 }
